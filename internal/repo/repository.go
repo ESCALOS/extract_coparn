@@ -199,7 +199,7 @@ func (r *Repository) OnRetryFailure(ctx context.Context, retryID int64, fileCodi
 	const q = `UPDATE retry_queue
 	SET intentos = intentos + 1,
 	    estado = CASE WHEN intentos + 1 >= $2 THEN $5 ELSE $3 END,
-	    next_retry_at = CASE WHEN intentos + 1 >= $2 THEN NULL ELSE $4 END,
+	    next_retry_at = CASE WHEN intentos + 1 >= $2 THEN NULL ELSE $4::timestamp END,
 	    ultimo_error = $6,
 	    updated_at = NOW()
 	WHERE id=$1
