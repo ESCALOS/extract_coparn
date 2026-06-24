@@ -35,6 +35,7 @@ type RetryRow struct {
 type DispatchRecord struct {
 	FileCodigo    string
 	NombreArchivo string
+	Ruta          string
 	Estado        domain.FileState
 	Intentos      int
 }
@@ -224,10 +225,10 @@ func (r *Repository) OnRetryFailure(ctx context.Context, retryID int64, fileCodi
 }
 
 func (r *Repository) GetDispatchByCode(ctx context.Context, fileCodigo string) (*DispatchRecord, error) {
-	const q = `SELECT file_codigo, nombre_archivo, estado, intentos FROM file_dispatch WHERE file_codigo=$1`
+	const q = `SELECT file_codigo, nombre_archivo, ruta, estado, intentos FROM file_dispatch WHERE file_codigo=$1`
 	var rec DispatchRecord
 	var st string
-	err := r.db.QueryRowContext(ctx, q, fileCodigo).Scan(&rec.FileCodigo, &rec.NombreArchivo, &st, &rec.Intentos)
+	err := r.db.QueryRowContext(ctx, q, fileCodigo).Scan(&rec.FileCodigo, &rec.NombreArchivo, &rec.Ruta, &st, &rec.Intentos)
 	if err != nil {
 		return nil, err
 	}

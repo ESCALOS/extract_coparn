@@ -256,6 +256,38 @@ func (o *Orchestrator) processRetryItem(ctx context.Context, rr repo.RetryRow) {
 		return
 	}
 	localPath := filepath.Join(o.cfg.App.DataDir, rec.NombreArchivo)
+	if _, err := os.Stat(localPath); err != nil {
+		if !os.IsNotExist(err) {
+			o.handleRetryFailure(ctx, rr, err)
+			return
+		}
+
+		token, _, err := o.api.EnsureToken(ctx)
+		if err != nil {
+			o.alerts.ServiceDown("API", err)
+			o.handleRetryFailure(ctx, rr, fmt.Errorf("api token: %w", err))
+			return
+		}
+		o.alerts.ServiceOK("API")
+
+		signedURL, err := o.api.GetSignedURL(ctx, token, rec.Ruta, rec.NombreArchivo)
+		if err != nil {
+			o.alerts.ServiceDown("API", err)
+			o.handleRetryFailure(ctx, rr, fmt.Errorf("signed-url: %w", err))
+			return
+		}
+		o.alerts.ServiceOK("API")
+
+		dl, err := client.DownloadFile(ctx, signedURL, o.cfg.App.DataDir, rec.NombreArchivo, o.cfg.API.Timeout)
+		if err != nil {
+			o.handleRetryFailure(ctx, rr, fmt.Errorf("download: %w", err))
+			return
+		}
+		localPath = dl.Path
+		if err := o.repo.MarkDownloaded(ctx, rr.FileCodigo); err != nil {
+			log.Printf("retry mark downloaded %s: %v", rr.FileCodigo, err)
+		}
+	}
 
 	sftpPath, err := o.sftp.UploadFile(ctx, localPath, rec.NombreArchivo)
 	if err == nil {
@@ -271,6 +303,10 @@ func (o *Orchestrator) processRetryItem(ctx context.Context, rr repo.RetryRow) {
 	}
 
 	o.alerts.ServiceDown("SFTP", err)
+	o.handleRetryFailure(ctx, rr, err)
+}
+
+func (o *Orchestrator) handleRetryFailure(ctx context.Context, rr repo.RetryRow, err error) {
 	nextAttempt := rr.Intentos + 1
 	delay := retry.NextDelay(nextAttempt, o.cfg.Retry.JitterPct)
 	becameFailed, upErr := o.repo.OnRetryFailure(ctx, rr.ID, rr.FileCodigo, time.Now().Add(delay), err.Error(), o.cfg.Retry.MaxAttempts)

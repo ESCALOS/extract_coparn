@@ -65,6 +65,7 @@ type EmailConfig struct {
 	Password string
 	From     string
 	To       string
+	Timeout  time.Duration
 }
 
 type RetryConfig struct {
@@ -119,6 +120,7 @@ func Load() (*Config, error) {
 			Password: os.Getenv("ALERT_SMTP_PASSWORD"),
 			From:     getString("ALERT_EMAIL_FROM", ""),
 			To:       getString("ALERT_EMAIL_TO", "stornblood6969@gmail.com"),
+			Timeout:  time.Duration(getInt("ALERT_SMTP_TIMEOUT_SECONDS", 10)) * time.Second,
 		},
 		Retry: RetryConfig{
 			MaxAttempts: getInt("RETRY_MAX_ATTEMPTS", 10),
