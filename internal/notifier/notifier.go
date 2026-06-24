@@ -23,6 +23,11 @@ type SMTPNotifier struct {
 	cfg config.EmailConfig
 }
 
+type loginAuth struct {
+	username string
+	password string
+}
+
 func New(cfg config.EmailConfig) Notifier {
 	if !cfg.Enabled {
 		return Noop{}
@@ -32,7 +37,7 @@ func New(cfg config.EmailConfig) Notifier {
 
 func (n *SMTPNotifier) Send(subject, body string) error {
 	if n.cfg.Host == "" || n.cfg.From == "" || n.cfg.To == "" {
-		return fmt.Errorf("configuración SMTP incompleta")
+		return fmt.Errorf("configuracion SMTP incompleta")
 	}
 	timeout := n.cfg.Timeout
 	if timeout <= 0 {
@@ -60,8 +65,7 @@ func (n *SMTPNotifier) Send(subject, body string) error {
 		}
 	}
 	if n.cfg.User != "" {
-		auth := smtp.PlainAuth("", n.cfg.User, n.cfg.Password, n.cfg.Host)
-		if err := c.Auth(auth); err != nil {
+		if err := c.Auth(n.auth(c)); err != nil {
 			return err
 		}
 	}
@@ -86,6 +90,30 @@ func (n *SMTPNotifier) Send(subject, body string) error {
 		return err
 	}
 	return c.Quit()
+}
+
+func (n *SMTPNotifier) auth(c *smtp.Client) smtp.Auth {
+	if ok, mechanisms := c.Extension("AUTH"); ok {
+		if strings.Contains(strings.ToUpper(mechanisms), "LOGIN") {
+			return loginAuth{username: n.cfg.User, password: n.cfg.Password}
+		}
+	}
+	return smtp.PlainAuth("", n.cfg.User, n.cfg.Password, n.cfg.Host)
+}
+
+func (a loginAuth) Start(*smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", nil, nil
+}
+
+func (a loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+	challenge := strings.ToLower(string(fromServer))
+	if strings.Contains(challenge, "user") {
+		return []byte(a.username), nil
+	}
+	return []byte(a.password), nil
 }
 
 func message(from, to, subject, body string) string {
