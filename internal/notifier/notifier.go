@@ -3,6 +3,7 @@ package notifier
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net"
 	"net/smtp"
 	"strings"
@@ -119,7 +120,10 @@ func (a loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 func message(from, to, subject, body string) string {
 	return "From: " + from + "\r\n" +
 		"To: " + to + "\r\n" +
-		"Subject: " + subject + "\r\n" +
+		"Subject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\n" +
+		"Content-Transfer-Encoding: 8bit\r\n" +
 		"\r\n" + body + "\r\n"
 }
 
